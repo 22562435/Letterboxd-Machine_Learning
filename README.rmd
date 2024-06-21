@@ -1,0 +1,210 @@
+---
+output:
+  md_document:
+    variant: markdown_github
+---
+
+# Purpose
+
+Purpose of this work folder is for the Machine learning project
+
+Ideally store a minimum working example data set in data folder.
+
+Add binary files in bin, and closed R functions in code. Human Readable settings files (e.g. csv) should be placed in settings/
+
+
+```{r}
+install.packages(c("tidyverse", "tidytext", "caret", "text", "recipes", "tidymodels", "xgboost", "randomForest"))
+
+install.packages("neuralnet")
+rm(list = ls()) # Clean your environment:
+gc() # garbage collection - It can be useful to call gc after a large object has been removed, as this may prompt R to return memory to the operating system.
+
+
+# Load the libraries
+library(tidytext)
+library(caret)
+library(text)
+library(recipes)
+library(tidymodels)
+library(xgboost)
+library(randomForest)
+library(tidyverse)
+library(dplyr)
+
+list.files('code/', full.names = T, recursive = T) %>% .[grepl('.R', .)] %>% as.list() %>% walk(~source(.))
+import_multiple_csv()
+
+
+
+temp <- list.files(path="data/.") #fetching the file names
+for (i in 1:length(temp)) assign(gsub(pattern = ".csv",x=temp[i],replacement = ""), read.csv(paste("data/",temp[i],sep="")))#importing them into r
+rm(i,temp)#removing temporary variables
+
+n_distinct(actors$id)
+#number of films variable
+
+```
+
+# Introduction 
+
+Label outcome here and problem at hand. Make up fake scenario of why this machine learning bit needs to be done. 
+
+
+
+
+
+
+
+# Data 
+
+
+```{r}
+head(actors)
+head(countries)
+head(crew)
+head(genres)
+head(languages)
+head(movies)
+#head(releases)
+head(studios)
+head(themes)
+```
+
+```{r}
+(releases)  %>% filter(id == 1000001)
+
+
+(movies) %>% filter(id == 1000001)
+actors %>% filter(id == 1000001)
+(countries)  %>% filter(id == 1000001)
+(crew)  %>% filter(id == 1000001)
+(genres)  %>% filter(id == 1000001)
+(languages)  %>% filter(id == 1000001)
+(studios)  %>% filter(id == 1000001)
+(themes)  %>% filter(id == 1000001)
+
+```
+
+
+
+```{r}
+library(dplyr)
+library(tidyr)
+
+# Aggregate actors this works
+actors_agg <- actors %>%
+  group_by(id) %>%
+  summarise(actor_list = paste(name, collapse = ", "), .groups = 'drop')
+
+# Aggregate countries this works 
+countries_agg <- countries %>%
+  group_by(id) %>%
+  summarise(countries = paste(country, collapse = ", "), .groups = 'drop')
+
+# Aggregate crew, works
+crew_agg <- crew %>%
+  group_by(id, role) %>%
+  summarise(names = paste(name, collapse = ", "), .groups = 'drop') %>%
+  pivot_wider(names_from = role, values_from = names, values_fill = list(names = ""))
+
+#genre works
+genres_agg <- genres %>%
+  mutate(present = 1) %>%
+  pivot_wider(names_from = genre, values_from = present, values_fill = list(present = 0))
+
+
+#language works
+languages_agg <- languages %>%
+  mutate(present = 1) %>%
+  pivot_wider(names_from = language, values_from = present, values_fill = list(present = 0)) %>% 
+    select(-type)
+
+studios_agg <- studios %>%
+  group_by(id) %>%
+  summarise(studio_list = paste(studio, collapse = ", "), .groups = 'drop')
+
+
+themes_agg <- themes %>%
+  group_by(id) %>%
+  summarise(theme_list = paste(theme, collapse = ", "), .groups = 'drop')
+
+
+
+
+
+
+
+releases_agg <- releases %>%
+  mutate(present = 1) %>%
+  pivot_wider(names_from = country, values_from = present, values_fill = list(present = 0))
+
+
+
+# Merge all aggregated data frames with the movies data frame
+final_data <- movies %>%
+  left_join(actors_agg, by = "id") %>%
+  left_join(countries_agg, by = "id") %>%
+  left_join(crew_agg, by = "id") %>%
+  left_join(genres_agg, by = "id") %>%
+  left_join(languages_agg, by = "id") %>%
+  left_join(studios_agg, by = "id") %>%
+  left_join(themes_agg, by = "id")
+
+# View the final data frame
+head(final_data)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r clean movies}
+#there are a number of films that do not have a rating attached to them, create a subset where they are removed
+
+
+#many small films and not released films do not have a rating, small because need 30-50 reviews to get a rating.
+movies_cleaned<-subset(movies, is.na(movies$rating)==FALSE) #now i have 85614 films, compared to 896400, except these have ratings. 
+
+```
+
+```{r experience}
+#want to create a variable that counts how many films an actor/actress has been in
+actors_experience <- actors %>%
+  group_by(name) %>%
+  summarise(experience = n_distinct(id)) #this counts how many films a person has been in
+actors <- actors %>%
+  left_join(actors_experience, by = "name") #join back to original data frame
+remove(actors_experience)
+
+
+
+#same thing but more complicated as both name and role have to be the same
+crew_experience <- crew %>%
+  group_by(name, role) %>%
+  summarise(role_experience = n_distinct(id), .groups = 'drop')
+
+crew <- crew %>%
+  left_join(crew_experience, by = c("name", "role"))
+
+```
+
